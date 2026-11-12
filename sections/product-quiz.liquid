@@ -401,6 +401,49 @@
     margin-top: 1.5em;
   }
 
+  /* Email step */
+  .pqz__form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    max-width: 28em;
+    margin: 2em auto 0;
+  }
+  .pqz .pqz__input {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 52px;
+    padding: 0.9em 1.25em;
+    border: var(--pqz-border) solid var(--pqz-ink);
+    border-radius: var(--pqz-btn-radius);
+    background: color-mix(in srgb, var(--pqz-bg), #fff 70%);
+    color: var(--pqz-ink);
+    font-size: 1.0625em;
+    text-align: center;
+  }
+  .pqz .pqz__input[aria-invalid='true'] {
+    border-color: #b42318;
+  }
+  .pqz__field-error {
+    color: #b42318;
+    font-size: 0.875em;
+  }
+  .pqz .pqz__submit {
+    margin-top: 1.5em;
+  }
+  .pqz__skip {
+    margin-top: 0.75em;
+  }
+  .pqz__visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
   @media screen and (min-width: 750px) {
     .pqz .pqz__heading {
       font-size: 2.5em;
@@ -639,6 +682,8 @@
     }
     // pqz:logic:end
 
+    const KLAVIYO_REVISION = '2026-10-15';
+
     const el = (tag, className, text) => {
       const node = document.createElement(tag);
       if (className) node.className = className;
@@ -662,7 +707,9 @@
 
         this.onClick = this.onClick.bind(this);
         this.onBlockSelect = this.onBlockSelect.bind(this);
+        this.onSubmit = this.onSubmit.bind(this);
         this.addEventListener('click', this.onClick);
+        this.addEventListener('submit', this.onSubmit);
         document.addEventListener('shopify:block:select', this.onBlockSelect);
         this.render();
       }
@@ -730,7 +777,8 @@
 
       next() {
         const step = this.state.step;
-        this.go(step < this.count - 1 ? step + 1 : this.count + 1);
+        if (step < this.count - 1) this.go(step + 1);
+        else this.go(this.emailEnabled ? this.count : this.count + 1);
       }
 
       back() {
@@ -761,6 +809,7 @@
         else if (target.matches('[data-pqz-continue]')) this.next();
         else if (target.matches('[data-pqz-back]')) this.back();
         else if (target.matches('[data-pqz-retake]')) this.retake();
+        else if (target.matches('[data-pqz-skip]')) this.go(this.count + 1);
       }
 
       visiblePicks(index) {
@@ -806,6 +855,7 @@
         }
         const step = this.state.step;
         if (step < this.count) this.renderQuestion(step);
+        else if (step === this.count && this.emailEnabled) this.renderEmail();
         else this.renderResults();
       }
 
@@ -958,6 +1008,160 @@
         summary.append(totalLine, addAll, discount, error, this.retakeButton());
         screen.append(summary);
         this.stage.append(screen);
+      }
+
+      // ---- email step ----
+      get emailEnabled() {
+        return Boolean(this.dataset.klaviyoKey && this.dataset.klaviyoList);
+      }
+
+      renderEmail() {
+        const id = `pqz-${this.dataset.sectionId}-email`;
+        const screen = el('div', 'pqz__screen pqz__screen--email');
+        screen.append(this.heading(this.t('emailHeading')));
+        const text = this.t('emailText');
+        if (text) screen.append(el('p', 'pqz__sub', text));
+
+        const form = el('form', 'pqz__form');
+        form.noValidate = true;
+        form.dataset.pqzEmailForm = '';
+        const label = el('label', 'pqz__visually-hidden', this.t('emailPlaceholder'));
+        label.htmlFor = id;
+        const input = el('input', 'pqz__input');
+        Object.assign(input, { type: 'email', id, name: 'email', autocomplete: 'email', required: true });
+        input.placeholder = this.t('emailPlaceholder');
+        input.setAttribute('aria-describedby', `${id}-error`);
+        const error = el('p', 'pqz__field-error', this.t('emailInvalid'));
+        error.id = `${id}-error`;
+        error.hidden = true;
+        const submit = el('button', 'pqz__btn pqz__submit', this.t('emailButton'));
+        submit.type = 'submit';
+        form.append(label, input, error, submit);
+
+        const skip = el('button', 'pqz__link pqz__skip', this.t('emailSkip'));
+        skip.type = 'button';
+        skip.dataset.pqzSkip = '';
+        const nav = el('div', 'pqz__nav');
+        const back = el('button', 'pqz__link pqz__back', this.t('back'));
+        back.type = 'button';
+        back.dataset.pqzBack = '';
+        nav.append(back);
+        screen.append(form, skip, nav);
+        this.stage.append(screen);
+      }
+
+      onSubmit(event) {
+        const form = event.target;
+        if (!form.matches || !form.matches('[data-pqz-email-form]')) return;
+        event.preventDefault();
+        const input = form.querySelector('input[type="email"]');
+        const error = form.querySelector('.pqz__field-error');
+        const email = input.value.trim();
+        const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        input.setAttribute('aria-invalid', String(!valid));
+        error.hidden = valid;
+        if (!valid) {
+          input.focus();
+          return;
+        }
+        this.claim(email);
+      }
+
+      // Show results first; Klaviyo and the discount run in the background and can never block the shopper.
+      claim(email) {
+        this.state.claimed = true;
+        this.go(this.count + 1);
+        this.sendToKlaviyo(email);
+        if (this.dataset.discountCode) this.linkDiscount().then(() => this.applyCode());
+      }
+
+      async sendToKlaviyo(email) {
+        const key = this.dataset.klaviyoKey;
+        const picks = prunePicks(this.questions, this.state.picks);
+        const stack = this.stack();
+        const props = { ...profileProperties(this.questions, picks), quiz_completed_at: new Date().toISOString() };
+        const total = stack.reduce((sum, { product }) => sum + product.price, 0);
+        const post = async (path, body) => {
+          try {
+            const res = await fetch(`https://a.klaviyo.com/client/${path}?company_id=${encodeURIComponent(key)}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/vnd.api+json',
+                Accept: 'application/vnd.api+json',
+                revision: KLAVIYO_REVISION,
+              },
+              body: JSON.stringify(body),
+            });
+            if (res.status !== 202) console.warn('[product-quiz] Klaviyo', path, res.status, await res.text().catch(() => ''));
+          } catch (e) {
+            console.warn('[product-quiz] Klaviyo', path, e);
+          }
+        };
+        await post(
+          'subscriptions',
+          subscriptionBody({ email, listId: this.dataset.klaviyoList, source: this.dataset.klaviyoSource, properties: props })
+        );
+        await post(
+          'events',
+          eventBody({
+            email,
+            eventName: this.dataset.klaviyoEvent || 'Completed Product Quiz',
+            properties: eventProperties({
+              questions: this.questions,
+              picks,
+              stack,
+              code: this.dataset.discountCode,
+              origin: window.location.origin,
+            }),
+            profileProperties: props,
+            value: total / 100,
+            currency: this.dataset.currency,
+          })
+        );
+        this.dispatchEvent(new CustomEvent('product-quiz:completed', { bubbles: true, detail: { properties: props, stack } }));
+      }
+
+      // ---- discount ----
+      // Shopify's shareable discount link sets the checkout discount cookie, so the code sticks even if they shop elsewhere first.
+      async linkDiscount() {
+        const code = this.dataset.discountCode;
+        const root = this.dataset.rootUrl.replace(/\/?$/, '/');
+        try {
+          await fetch(`${root}discount/${encodeURIComponent(code)}?redirect=${encodeURIComponent(`${this.dataset.cartUrl}.js`)}`, {
+            headers: { Accept: 'application/json' },
+          });
+        } catch (e) {
+          console.warn('[product-quiz] discount link', e);
+        }
+      }
+
+      // Put our code on the cart, keeping any other codes already there. Returns whether Shopify reports it applicable.
+      async applyCode() {
+        const code = this.dataset.discountCode;
+        if (!code) return true;
+        try {
+          const cart = await this.fetchCart();
+          const keep = (cart.discount_codes || []).map((d) => d.code).filter((c) => c.toLowerCase() !== code.toLowerCase());
+          const res = await fetch(`${this.dataset.cartUpdateUrl}.js`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ discount: [...keep, code].join(',') }),
+          });
+          const updated = await res.json();
+          const hit = (updated.discount_codes || []).find((d) => d.code.toLowerCase() === code.toLowerCase());
+          const ok = Boolean(res.ok && hit && hit.applicable);
+          // An empty cart can't use an order discount yet, so only warn when there's something in it.
+          if (!ok && updated.item_count) console.warn('[product-quiz] discount code not applicable', code, updated.discount_codes);
+          return ok;
+        } catch (e) {
+          console.warn('[product-quiz] discount code', e);
+          return false;
+        }
+      }
+
+      async fetchCart() {
+        const res = await fetch(`${this.dataset.cartUrl}.js`, { headers: { Accept: 'application/json' } });
+        return res.json();
       }
 
       retakeButton() {
