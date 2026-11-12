@@ -1,3 +1,416 @@
+{%- comment -%}
+  Product Finder Quiz. One portable section: markup, CSS, JS and settings in this file.
+  Docs: README.md (merchants) and AGENTS.md (AI agents) in https://github.com/BeauchampAndrew/Product_Quiz_Shopify
+{%- endcomment -%}
+{%- liquid
+  assign s = section.settings
+  case s.button_shape
+    when 'pill'
+      assign btn_radius = '999px'
+    when 'rounded'
+      assign btn_radius = '10px'
+    else
+      assign btn_radius = '0px'
+  endcase
+  assign quiz_collection = s.collection
+-%}
+
+<product-quiz
+  class="pqz{% if s.uppercase_headings %} pqz--upper{% endif %}"
+  data-section-id="{{ section.id }}"
+  style="--pqz-bg: {{ s.color_bg }}; --pqz-ink: {{ s.color_ink }}; --pqz-accent: {{ s.color_accent }}; --pqz-btn-fg: {{ s.color_button_text }}; --pqz-btn-radius: {{ btn_radius }}; --pqz-border: {{ s.border_width }}px; --pqz-max-width: {{ s.max_width }}em; --pqz-pad-top: {{ s.padding_top }}px; --pqz-pad-bottom: {{ s.padding_bottom }}px;"
+  data-money-sample="{{ 123456789 | money | strip_html | escape }}"
+  data-currency="{{ cart.currency.iso_code }}"
+  data-root-url="{{ routes.root_url }}"
+  data-cart-url="{{ routes.cart_url }}"
+  data-cart-add-url="{{ routes.cart_add_url }}"
+  data-cart-update-url="{{ routes.cart_update_url }}"
+  data-picks="{{ s.picks }}"
+  data-tie-tag="{{ s.tie_tag | strip | escape }}"
+  data-klaviyo-key="{{ s.klaviyo_public_key | strip | escape }}"
+  data-klaviyo-list="{{ s.klaviyo_list_id | strip | escape }}"
+  data-klaviyo-source="{{ s.klaviyo_source | escape }}"
+  data-klaviyo-event="{{ s.klaviyo_event | escape }}"
+  data-discount-code="{{ s.discount_code | strip | escape }}"
+  data-discount-percent="{{ s.discount_percent }}"
+  data-label-intro-heading="{{ s.intro_heading | escape }}"
+  data-label-intro-text="{{ s.intro_text | escape }}"
+  data-label-progress="{{ s.label_progress | escape }}"
+  data-label-back="{{ s.label_back | escape }}"
+  data-label-continue="{{ s.label_continue | escape }}"
+  data-label-email-heading="{{ s.email_heading | escape }}"
+  data-label-email-text="{{ s.email_text | escape }}"
+  data-label-email-placeholder="{{ s.email_placeholder | escape }}"
+  data-label-email-button="{{ s.email_button | escape }}"
+  data-label-email-skip="{{ s.email_skip | escape }}"
+  data-label-email-invalid="{{ s.email_invalid | escape }}"
+  data-label-results-heading="{{ s.results_heading | escape }}"
+  data-label-results-intro="{{ s.results_intro | escape }}"
+  data-label-matches="{{ s.label_matches | escape }}"
+  data-label-add="{{ s.label_add | escape }}"
+  data-label-adding="{{ s.label_adding | escape }}"
+  data-label-added="{{ s.label_added | escape }}"
+  data-label-add-all="{{ s.label_add_all | escape }}"
+  data-label-total="{{ s.label_total | escape }}"
+  data-label-discount="{{ s.label_discount | escape }}"
+  data-label-retake="{{ s.label_retake | escape }}"
+  data-label-error="{{ s.label_error | escape }}"
+  data-label-empty="{{ s.label_empty | escape }}"
+>
+  <div class="pqz__inner">
+    <div class="pqz__stage" data-pqz-stage></div>
+    <noscript><p class="pqz__empty">{{ s.label_empty }}</p></noscript>
+  </div>
+
+  {%- comment -%} Anchors so the theme editor can find each question block. JS renders the screens. {%- endcomment -%}
+  {%- for block in section.blocks -%}
+    <div hidden {{ block.shopify_attributes }}></div>
+  {%- endfor -%}
+
+  <script type="application/json" data-pqz-config>
+    {
+      "questions": [
+        {%- for block in section.blocks -%}
+          {
+            "id": {{ block.id | json }},
+            "heading": {{ block.settings.heading | json }},
+            "subheading": {{ block.settings.subheading | json }},
+            "answers": {{ block.settings.answers | json }},
+            "multi": {{ block.settings.multi | json }},
+            "role": {{ block.settings.role | json }},
+            "weight": {{ block.settings.weight | default: 0 | json }},
+            "field": {{ block.settings.field | json }}
+          }{%- unless forloop.last -%},{%- endunless -%}
+        {%- endfor -%}
+      ],
+      "products": [
+        {%- if quiz_collection != blank -%}
+          {%- for product in quiz_collection.products limit: 50 -%}
+            {%- assign variant = product.selected_or_first_available_variant -%}
+            {
+              "id": {{ product.id | json }},
+              "title": {{ product.title | json }},
+              "url": {{ product.url | json }},
+              "image": {% if product.featured_image %}{{ product.featured_image | image_url: width: 600 | json }}{% else %}""{% endif %},
+              "price": {{ variant.price | json }},
+              "variantId": {{ variant.id | json }},
+              "available": {{ product.available | json }},
+              "tags": {{ product.tags | json }},
+              "blurb": {{ product.description | strip_html | strip_newlines | truncate: 400 | json }}
+            }{%- unless forloop.last -%},{%- endunless -%}
+          {%- endfor -%}
+        {%- endif -%}
+      ]
+    }
+  </script>
+</product-quiz>
+
+{% stylesheet %}
+  /* Product quiz. Everything is scoped under .pqz; colors and shapes come from --pqz-* variables set by the section settings. */
+  .pqz {
+    display: block;
+    background: var(--pqz-bg);
+    color: var(--pqz-ink);
+    padding: var(--pqz-pad-top) 16px var(--pqz-pad-bottom);
+    line-height: 1.5;
+  }
+
+  /* Neutralize theme tag styles at zero specificity; component rules below win. */
+  .pqz :where(button, input) {
+    font: inherit;
+    color: inherit;
+    letter-spacing: inherit;
+    text-transform: none;
+    margin: 0;
+    box-shadow: none;
+    min-width: 0;
+  }
+  .pqz :where(button) {
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .pqz :where(h2, h3, p) {
+    margin: 0;
+    padding: 0;
+    color: inherit;
+  }
+  .pqz :where(ul, li) {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .pqz :where(a) {
+    color: inherit;
+  }
+  .pqz :where(img) {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+  .pqz :focus-visible {
+    outline: 2px solid var(--pqz-accent);
+    outline-offset: 3px;
+  }
+  .pqz [hidden] {
+    display: none !important;
+  }
+
+  .pqz__inner {
+    max-width: 72em;
+    margin: 0 auto;
+    text-align: center;
+  }
+  .pqz__screen--question,
+  .pqz__screen--email {
+    max-width: var(--pqz-max-width);
+    margin: 0 auto;
+  }
+
+  /* Intro (question 1 only) */
+  .pqz__intro {
+    margin-bottom: 1.75em;
+  }
+  .pqz__intro-heading {
+    font-size: 0.8125em;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .pqz__intro-text {
+    margin-top: 0.25em;
+    opacity: 0.8;
+  }
+
+  /* Progress */
+  .pqz__progress {
+    position: relative;
+    height: 12px;
+    border: var(--pqz-border) solid var(--pqz-ink);
+    overflow: hidden;
+  }
+  .pqz__progress-fill {
+    display: block;
+    height: 100%;
+    width: var(--pqz-fill, 0%);
+    background: var(--pqz-accent);
+    transition: width 0.35s ease;
+  }
+  .pqz__progress-text {
+    margin-top: 0.5em;
+    font-size: 0.8125em;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  /* Headings */
+  .pqz .pqz__heading {
+    margin: 1.25em 0 0;
+    font-size: 1.75em;
+    line-height: 1.1;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .pqz.pqz--upper .pqz__heading {
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+  }
+  .pqz .pqz__heading:focus {
+    outline: none;
+  }
+  .pqz__sub {
+    margin-top: 0.75em;
+    font-size: 1.0625em;
+    opacity: 0.85;
+  }
+
+  /* Answers */
+  .pqz__answers {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 28em;
+    margin: 2em auto 0;
+  }
+  .pqz .pqz__answer {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 52px;
+    padding: 0.9em 1.25em;
+    border: var(--pqz-border) solid var(--pqz-ink);
+    border-radius: var(--pqz-btn-radius);
+    background: transparent;
+    font-size: 1.0625em;
+    line-height: 1.3;
+    text-align: center;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .pqz .pqz__answer:hover {
+    background: color-mix(in srgb, var(--pqz-ink) 7%, transparent);
+  }
+  .pqz .pqz__answer[aria-pressed='true'] {
+    background: var(--pqz-ink);
+    color: var(--pqz-btn-fg);
+  }
+
+  /* Buttons and links */
+  .pqz .pqz__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    box-sizing: border-box;
+    min-height: 48px;
+    padding: 0.9em 2em;
+    border: var(--pqz-border) solid var(--pqz-ink);
+    border-radius: var(--pqz-btn-radius);
+    background: var(--pqz-ink);
+    color: var(--pqz-btn-fg);
+    font-size: 0.875em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: opacity 0.15s ease;
+  }
+  .pqz .pqz__btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+  .pqz .pqz__btn.is-loading {
+    opacity: 0.7;
+    cursor: progress;
+  }
+  .pqz .pqz__btn--outline {
+    background: transparent;
+    color: var(--pqz-ink);
+  }
+  .pqz__continue {
+    margin-top: 2.5em;
+  }
+  .pqz__nav {
+    margin-top: 1.75em;
+  }
+  .pqz .pqz__link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 1em;
+    font-size: 0.8125em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+  }
+  .pqz .pqz__back::before {
+    content: '\2190\00a0';
+  }
+
+  /* Results */
+  .pqz__grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 40px 24px;
+    margin-top: 2.5em;
+  }
+  .pqz__card {
+    display: flex;
+    flex: 1 1 100%;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5em;
+    max-width: 24em;
+    text-align: center;
+  }
+  .pqz__card-media {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    margin-bottom: 0.5em;
+    background: color-mix(in srgb, var(--pqz-ink) 5%, transparent);
+  }
+  .pqz .pqz__card-media img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .pqz .pqz__card-title {
+    font-size: 1.125em;
+    line-height: 1.25;
+    letter-spacing: 0;
+    text-transform: none;
+  }
+  .pqz__card-title a {
+    text-decoration: none;
+  }
+  .pqz__card-price {
+    font-weight: 600;
+  }
+  .pqz__card-matches {
+    font-size: 0.75em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .pqz__card-blurb {
+    font-size: 0.9375em;
+    line-height: 1.45;
+    opacity: 0.85;
+  }
+  .pqz .pqz__card .pqz__btn {
+    width: 100%;
+    margin-top: auto;
+  }
+  .pqz__card-cta {
+    width: 100%;
+    margin-top: auto;
+    padding-top: 0.75em;
+  }
+  .pqz__summary {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75em;
+    margin-top: 3em;
+  }
+  .pqz__total {
+    font-size: 1.125em;
+  }
+  .pqz__total-label {
+    margin-right: 0.4em;
+  }
+  .pqz__was {
+    margin-right: 0.4em;
+    opacity: 0.6;
+  }
+  .pqz__discount {
+    font-size: 0.9375em;
+    font-weight: 600;
+  }
+  .pqz__error {
+    color: #b42318;
+    font-size: 0.9375em;
+  }
+  .pqz__empty {
+    margin-top: 1.5em;
+  }
+
+  @media screen and (min-width: 750px) {
+    .pqz .pqz__heading {
+      font-size: 2.5em;
+    }
+    .pqz__card {
+      flex: 0 1 calc((100% - 48px) / 3);
+    }
+  }
+{% endstylesheet %}
+
 {% javascript %}
   (() => {
     if (customElements.get('product-quiz')) return;
@@ -225,5 +638,795 @@
       };
     }
     // pqz:logic:end
+
+    const el = (tag, className, text) => {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text != null) node.textContent = text;
+      return node;
+    };
+
+    class ProductQuiz extends HTMLElement {
+      connectedCallback() {
+        let config = {};
+        try {
+          config = JSON.parse(this.querySelector('[data-pqz-config]').textContent);
+        } catch (e) {
+          console.warn('[product-quiz] could not read the quiz config', e);
+        }
+        this.questions = normalizeQuestions(config.questions);
+        this.products = normalizeProducts(config.products);
+        this.stage = this.querySelector('[data-pqz-stage]');
+        this.storageKey = `pqz:${this.dataset.sectionId}:${window.location.pathname}`;
+        this.state = this.restore();
+
+        this.onClick = this.onClick.bind(this);
+        this.onBlockSelect = this.onBlockSelect.bind(this);
+        this.addEventListener('click', this.onClick);
+        document.addEventListener('shopify:block:select', this.onBlockSelect);
+        this.render();
+      }
+
+      disconnectedCallback() {
+        this.removeEventListener('click', this.onClick);
+        document.removeEventListener('shopify:block:select', this.onBlockSelect);
+        clearTimeout(this.advanceTimer);
+      }
+
+      // ---- labels ----
+      // t('emailHeading', { percent: 15 }) reads data-label-email-heading and fills [percent].
+      t(key, vars = {}) {
+        const raw = this.dataset[`label${key[0].toUpperCase()}${key.slice(1)}`] || '';
+        return raw.replace(/\[(\w+)\]/g, (m, name) => (name in vars ? String(vars[name]) : m));
+      }
+
+      money(cents) {
+        return formatMoney(cents, this.dataset.moneySample);
+      }
+
+      // ---- state ----
+      freshState() {
+        return { step: 0, picks: {}, claimed: false };
+      }
+
+      save() {
+        try {
+          sessionStorage.setItem(this.storageKey, JSON.stringify(this.state));
+        } catch (e) {}
+      }
+
+      restore() {
+        try {
+          const saved = sanitizeState(this.questions, JSON.parse(sessionStorage.getItem(this.storageKey)));
+          if (saved) return saved;
+        } catch (e) {}
+        return this.freshState();
+      }
+
+      get count() {
+        return this.questions.length;
+      }
+
+      get discountActive() {
+        return Boolean(this.state.claimed && this.dataset.discountCode);
+      }
+
+      stack() {
+        return pickStack(this.products, this.questions, prunePicks(this.questions, this.state.picks), {
+          count: Number(this.dataset.picks) || 3,
+          tieTag: this.dataset.tieTag,
+        });
+      }
+
+      // ---- navigation ----
+      go(step) {
+        this.state.step = step;
+        this.save();
+        this.render();
+        const focusTarget = this.stage.querySelector('[data-pqz-focus]');
+        if (focusTarget) focusTarget.focus({ preventScroll: true });
+        if (this.getBoundingClientRect().top < 0) this.scrollIntoView({ block: 'start' });
+      }
+
+      next() {
+        const step = this.state.step;
+        this.go(step < this.count - 1 ? step + 1 : this.count + 1);
+      }
+
+      back() {
+        if (this.state.step > 0) this.go(Math.min(this.state.step, this.count) - 1);
+      }
+
+      retake() {
+        try {
+          sessionStorage.removeItem(this.storageKey);
+        } catch (e) {}
+        this.state = this.freshState();
+        this.go(0);
+      }
+
+      onBlockSelect(event) {
+        const detail = event.detail || {};
+        if (detail.sectionId !== this.dataset.sectionId) return;
+        const index = this.questions.findIndex((q) => q.id === detail.blockId);
+        if (index === -1) return;
+        this.state.step = index;
+        this.render();
+      }
+
+      onClick(event) {
+        const target = event.target.closest('button');
+        if (!target || !this.contains(target)) return;
+        if (target.matches('[data-pqz-answer]')) this.answer(Number(target.dataset.pqzAnswer));
+        else if (target.matches('[data-pqz-continue]')) this.next();
+        else if (target.matches('[data-pqz-back]')) this.back();
+        else if (target.matches('[data-pqz-retake]')) this.retake();
+      }
+
+      visiblePicks(index) {
+        const q = this.questions[index];
+        const hidden = hiddenAnswers(this.questions, this.state.picks, index);
+        return (this.state.picks[q.id] || []).filter((i) => !hidden.has(i));
+      }
+
+      answer(index) {
+        if (this.advancing) return;
+        const step = this.state.step;
+        const q = this.questions[step];
+        if (!q) return;
+        if (q.multi) {
+          const picked = toggleMulti(q.answers, this.visiblePicks(step), index);
+          if (picked.length) this.state.picks[q.id] = picked;
+          else delete this.state.picks[q.id];
+          this.save();
+          this.render();
+          const again = this.stage.querySelector(`[data-pqz-answer="${index}"]`);
+          if (again) again.focus();
+          return;
+        }
+        this.state.picks[q.id] = [index];
+        this.save();
+        this.stage.querySelectorAll('[data-pqz-answer]').forEach((b) => {
+          b.setAttribute('aria-pressed', String(Number(b.dataset.pqzAnswer) === index));
+        });
+        // Brief pause so the shopper sees their pick; ignore further taps so a double tap can't skip a question.
+        this.advancing = true;
+        this.advanceTimer = setTimeout(() => {
+          this.advancing = false;
+          this.next();
+        }, 200);
+      }
+
+      // ---- rendering ----
+      render() {
+        this.stage.replaceChildren();
+        if (!this.count) {
+          this.stage.append(el('p', 'pqz__empty', this.t('empty')));
+          return;
+        }
+        const step = this.state.step;
+        if (step < this.count) this.renderQuestion(step);
+        else this.renderResults();
+      }
+
+      heading(text) {
+        const h = el('h2', 'pqz__heading', text);
+        h.tabIndex = -1;
+        h.dataset.pqzFocus = '';
+        h.id = `pqz-${this.dataset.sectionId}-heading`;
+        return h;
+      }
+
+      renderQuestion(index) {
+        const q = this.questions[index];
+        const screen = el('div', 'pqz__screen pqz__screen--question');
+
+        const introHeading = this.t('introHeading');
+        const introText = this.t('introText');
+        if (index === 0 && (introHeading || introText)) {
+          const intro = el('div', 'pqz__intro');
+          if (introHeading) intro.append(el('p', 'pqz__intro-heading', introHeading));
+          if (introText) intro.append(el('p', 'pqz__intro-text', introText));
+          screen.append(intro);
+        }
+
+        const progressText = this.t('progress', { current: index + 1, total: this.count });
+        const bar = el('div', 'pqz__progress');
+        bar.setAttribute('role', 'progressbar');
+        bar.setAttribute('aria-valuemin', '1');
+        bar.setAttribute('aria-valuemax', String(this.count));
+        bar.setAttribute('aria-valuenow', String(index + 1));
+        bar.setAttribute('aria-valuetext', progressText);
+        bar.style.setProperty('--pqz-fill', `${((index + 1) / this.count) * 100}%`);
+        bar.append(el('span', 'pqz__progress-fill'));
+        screen.append(bar, el('p', 'pqz__progress-text', progressText));
+
+        const h = this.heading(q.heading);
+        screen.append(h);
+        if (q.subheading) screen.append(el('p', 'pqz__sub', q.subheading));
+
+        const hidden = hiddenAnswers(this.questions, this.state.picks, index);
+        const picked = this.visiblePicks(index);
+        const list = el('div', 'pqz__answers');
+        list.setAttribute('role', 'group');
+        list.setAttribute('aria-labelledby', h.id);
+        q.answers.forEach((a, i) => {
+          if (hidden.has(i)) return;
+          const b = el('button', 'pqz__answer', a.label);
+          b.type = 'button';
+          b.dataset.pqzAnswer = String(i);
+          b.setAttribute('aria-pressed', String(picked.includes(i)));
+          list.append(b);
+        });
+        screen.append(list);
+
+        if (q.multi) {
+          const go = el('button', 'pqz__btn pqz__continue', this.t('continue'));
+          go.type = 'button';
+          go.dataset.pqzContinue = '';
+          go.disabled = !picked.length;
+          screen.append(go);
+        }
+
+        if (index > 0) {
+          const nav = el('div', 'pqz__nav');
+          const back = el('button', 'pqz__link pqz__back', this.t('back'));
+          back.type = 'button';
+          back.dataset.pqzBack = '';
+          nav.append(back);
+          screen.append(nav);
+        }
+
+        this.stage.append(screen);
+      }
+
+      renderResults() {
+        const items = this.stack();
+        const screen = el('div', 'pqz__screen pqz__screen--results');
+        screen.append(this.heading(this.t('resultsHeading')));
+        const intro = this.t('resultsIntro');
+        if (intro) screen.append(el('p', 'pqz__sub', intro));
+
+        if (!items.length) {
+          screen.append(el('p', 'pqz__empty', this.t('empty')), this.retakeButton());
+          this.stage.append(screen);
+          return;
+        }
+
+        const grid = el('ul', 'pqz__grid');
+        items.forEach(({ product, matches }) => {
+          const card = el('li', 'pqz__card');
+          card.dataset.pqzCard = '';
+          const media = el('a', 'pqz__card-media');
+          media.href = product.url;
+          media.tabIndex = -1;
+          media.setAttribute('aria-hidden', 'true');
+          if (product.image) {
+            const img = el('img');
+            img.src = product.image;
+            img.alt = '';
+            img.loading = 'lazy';
+            img.width = 600;
+            img.height = 600;
+            media.append(img);
+          }
+          const title = el('h3', 'pqz__card-title');
+          const link = el('a', '', product.title);
+          link.href = product.url;
+          title.append(link);
+          card.append(media, title, el('p', 'pqz__card-price', this.money(product.price)));
+          if (matches.length) card.append(el('p', 'pqz__card-matches', this.t('matches', { answers: matches.join(' · ') })));
+          if (product.blurb) card.append(el('p', 'pqz__card-blurb', product.blurb));
+          const cta = el('div', 'pqz__card-cta');
+          const add = el('button', 'pqz__btn', this.t('add'));
+          add.type = 'button';
+          add.dataset.pqzAdd = '';
+          add.dataset.variantId = String(product.variantId);
+          add.dataset.label = this.t('add');
+          cta.append(add);
+          card.append(cta);
+          grid.append(card);
+        });
+        screen.append(grid);
+
+        const total = items.reduce((sum, { product }) => sum + product.price, 0);
+        const summary = el('div', 'pqz__summary');
+        const totalLine = el('p', 'pqz__total');
+        totalLine.dataset.pqzTotal = '';
+        totalLine.append(el('span', 'pqz__total-label', this.t('total')));
+        if (this.discountActive) {
+          totalLine.append(el('s', 'pqz__was', this.money(total)));
+          totalLine.append(el('strong', '', this.money(discountedTotal(total, this.dataset.discountPercent))));
+        } else {
+          totalLine.append(el('strong', '', this.money(total)));
+        }
+        const addAll = el('button', 'pqz__btn', this.t('addAll'));
+        addAll.type = 'button';
+        addAll.dataset.pqzAddAll = '';
+        addAll.dataset.label = this.t('addAll');
+        const discount = el(
+          'p',
+          'pqz__discount',
+          this.t('discount', { percent: this.dataset.discountPercent, code: this.dataset.discountCode })
+        );
+        discount.dataset.pqzDiscount = '';
+        discount.hidden = !this.discountActive;
+        const error = el('p', 'pqz__error');
+        error.dataset.pqzError = '';
+        error.setAttribute('role', 'alert');
+        error.hidden = true;
+        summary.append(totalLine, addAll, discount, error, this.retakeButton());
+        screen.append(summary);
+        this.stage.append(screen);
+      }
+
+      retakeButton() {
+        const b = el('button', 'pqz__link', this.t('retake'));
+        b.type = 'button';
+        b.dataset.pqzRetake = '';
+        return b;
+      }
+    }
+
+    customElements.define('product-quiz', ProductQuiz);
   })();
 {% endjavascript %}
+
+{% schema %}
+{
+  "name": "Product quiz",
+  "tag": "section",
+  "class": "pqz-section",
+  "max_blocks": 50,
+  "settings": [
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "collection",
+      "id": "collection",
+      "label": "Products to recommend",
+      "info": "The quiz picks from this collection (first 50 products). Tag products to match your answers."
+    },
+    {
+      "type": "range",
+      "id": "picks",
+      "label": "Number of picks",
+      "min": 1,
+      "max": 6,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "text",
+      "id": "tie_tag",
+      "label": "Tie-break tag",
+      "default": "bestseller",
+      "info": "When two products score the same, the one with this tag goes first."
+    },
+    {
+      "type": "text",
+      "id": "intro_heading",
+      "label": "Intro heading",
+      "default": "Find your daily stack",
+      "info": "Shows above question 1 only. Leave both intro fields blank to hide it."
+    },
+    {
+      "type": "text",
+      "id": "intro_text",
+      "label": "Intro text",
+      "default": "5 quick questions and we'll build your routine."
+    },
+    {
+      "type": "header",
+      "content": "Klaviyo"
+    },
+    {
+      "type": "paragraph",
+      "content": "Fill in both to show the email step. Answers are saved on the Klaviyo profile and a quiz event is sent for flows."
+    },
+    {
+      "type": "text",
+      "id": "klaviyo_public_key",
+      "label": "Public API key (site ID)",
+      "info": "The 6-character public key. Never a private key."
+    },
+    {
+      "type": "text",
+      "id": "klaviyo_list_id",
+      "label": "List ID"
+    },
+    {
+      "type": "text",
+      "id": "klaviyo_source",
+      "label": "Signup source",
+      "default": "Product Quiz"
+    },
+    {
+      "type": "text",
+      "id": "klaviyo_event",
+      "label": "Event name",
+      "default": "Completed Product Quiz"
+    },
+    {
+      "type": "header",
+      "content": "Discount"
+    },
+    {
+      "type": "text",
+      "id": "discount_code",
+      "label": "Discount code",
+      "info": "Applied to the cart after the shopper shares their email. Create the code in Discounts first."
+    },
+    {
+      "type": "number",
+      "id": "discount_percent",
+      "label": "Discount percent",
+      "default": 15,
+      "info": "Only used to show the discounted total. Match the code."
+    },
+    {
+      "type": "header",
+      "content": "Colors"
+    },
+    {
+      "type": "color",
+      "id": "color_bg",
+      "label": "Background",
+      "default": "#F4F3F1"
+    },
+    {
+      "type": "color",
+      "id": "color_ink",
+      "label": "Text and borders",
+      "default": "#222222"
+    },
+    {
+      "type": "color",
+      "id": "color_accent",
+      "label": "Progress bar",
+      "default": "#D93A32"
+    },
+    {
+      "type": "color",
+      "id": "color_button_text",
+      "label": "Text on dark buttons",
+      "default": "#FFFFFF"
+    },
+    {
+      "type": "header",
+      "content": "Style"
+    },
+    {
+      "type": "select",
+      "id": "button_shape",
+      "label": "Button shape",
+      "options": [
+        {
+          "value": "square",
+          "label": "Square"
+        },
+        {
+          "value": "rounded",
+          "label": "Rounded"
+        },
+        {
+          "value": "pill",
+          "label": "Pill"
+        }
+      ],
+      "default": "square"
+    },
+    {
+      "type": "range",
+      "id": "border_width",
+      "label": "Border width",
+      "min": 1,
+      "max": 4,
+      "step": 1,
+      "unit": "px",
+      "default": 1
+    },
+    {
+      "type": "checkbox",
+      "id": "uppercase_headings",
+      "label": "Uppercase headings",
+      "default": true
+    },
+    {
+      "type": "range",
+      "id": "max_width",
+      "label": "Question width",
+      "min": 30,
+      "max": 60,
+      "step": 2,
+      "unit": "em",
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "padding_top",
+      "label": "Top padding",
+      "min": 0,
+      "max": 120,
+      "step": 8,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom",
+      "label": "Bottom padding",
+      "min": 0,
+      "max": 120,
+      "step": 8,
+      "unit": "px",
+      "default": 48
+    },
+    {
+      "type": "header",
+      "content": "Text and translations"
+    },
+    {
+      "type": "text",
+      "id": "label_progress",
+      "label": "Progress",
+      "default": "Question [current] of [total]"
+    },
+    {
+      "type": "text",
+      "id": "label_back",
+      "label": "Back",
+      "default": "Back"
+    },
+    {
+      "type": "text",
+      "id": "label_continue",
+      "label": "Continue (multi-select questions)",
+      "default": "Continue"
+    },
+    {
+      "type": "text",
+      "id": "email_heading",
+      "label": "Email step heading",
+      "default": "Share your email & get 15% off"
+    },
+    {
+      "type": "textarea",
+      "id": "email_text",
+      "label": "Email step text",
+      "default": "You'll get exclusive access to new products & promotions, 15% off your order, and we'll email you your personalized supplement recommendations."
+    },
+    {
+      "type": "text",
+      "id": "email_placeholder",
+      "label": "Email placeholder",
+      "default": "Enter email"
+    },
+    {
+      "type": "text",
+      "id": "email_button",
+      "label": "Email button",
+      "default": "Claim discount"
+    },
+    {
+      "type": "text",
+      "id": "email_skip",
+      "label": "Skip link",
+      "default": "Skip"
+    },
+    {
+      "type": "text",
+      "id": "email_invalid",
+      "label": "Invalid email message",
+      "default": "Enter a valid email address."
+    },
+    {
+      "type": "text",
+      "id": "results_heading",
+      "label": "Results heading",
+      "default": "Your stack"
+    },
+    {
+      "type": "text",
+      "id": "results_intro",
+      "label": "Results intro",
+      "default": "Based on your answers, here's where we'd start."
+    },
+    {
+      "type": "text",
+      "id": "label_matches",
+      "label": "Why it fits",
+      "default": "Matches: [answers]"
+    },
+    {
+      "type": "text",
+      "id": "label_add",
+      "label": "Add to cart",
+      "default": "Add to cart"
+    },
+    {
+      "type": "text",
+      "id": "label_adding",
+      "label": "Adding",
+      "default": "Adding..."
+    },
+    {
+      "type": "text",
+      "id": "label_added",
+      "label": "Added",
+      "default": "Added"
+    },
+    {
+      "type": "text",
+      "id": "label_add_all",
+      "label": "Add all",
+      "default": "Add all to cart"
+    },
+    {
+      "type": "text",
+      "id": "label_total",
+      "label": "Total",
+      "default": "Total"
+    },
+    {
+      "type": "text",
+      "id": "label_discount",
+      "label": "Discount applied",
+      "default": "[percent]% off applied at checkout with code [code]"
+    },
+    {
+      "type": "text",
+      "id": "label_retake",
+      "label": "Retake",
+      "default": "Retake quiz"
+    },
+    {
+      "type": "text",
+      "id": "label_error",
+      "label": "Add to cart error",
+      "default": "Couldn't add to cart. Please try again."
+    },
+    {
+      "type": "text",
+      "id": "label_empty",
+      "label": "No products",
+      "default": "No products to recommend yet."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "question",
+      "name": "Question",
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Question"
+        },
+        {
+          "type": "text",
+          "id": "subheading",
+          "label": "Subheading"
+        },
+        {
+          "type": "textarea",
+          "id": "answers",
+          "label": "Answers",
+          "info": "One answer per line: Answer text | product-tag, other-tag. Leave the tags off for answers that don't pick products."
+        },
+        {
+          "type": "checkbox",
+          "id": "multi",
+          "label": "Let shoppers pick more than one",
+          "default": false
+        },
+        {
+          "type": "select",
+          "id": "role",
+          "label": "What the answer does",
+          "options": [
+            {
+              "value": "rank",
+              "label": "Ranks products"
+            },
+            {
+              "value": "extra",
+              "label": "Adds a pick for each answer"
+            },
+            {
+              "value": "profile",
+              "label": "Saved to Klaviyo only"
+            }
+          ],
+          "default": "rank"
+        },
+        {
+          "type": "range",
+          "id": "weight",
+          "label": "Importance",
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "default": 5,
+          "info": "Products matching this answer get this many points.",
+          "visible_if": "{{ block.settings.role == 'rank' }}"
+        },
+        {
+          "type": "text",
+          "id": "field",
+          "label": "Klaviyo field name",
+          "info": "Saved on the Klaviyo profile. Defaults to quiz_q1, quiz_q2 and so on.",
+          "placeholder": "quiz_goal"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product quiz",
+      "blocks": [
+        {
+          "type": "question",
+          "settings": {
+            "heading": "What do you want help with most?",
+            "subheading": "",
+            "answers": "Energy | goal-energy\nSleep | goal-sleep\nDigestion | goal-gut\nStress | goal-calm",
+            "multi": false,
+            "role": "rank",
+            "weight": 10,
+            "field": "quiz_goal"
+          }
+        },
+        {
+          "type": "question",
+          "settings": {
+            "heading": "When do you feel it most?",
+            "subheading": "",
+            "answers": "Mornings | timing-morning\nAfternoon crash | timing-afternoon\nAt night | timing-night",
+            "multi": false,
+            "role": "rank",
+            "weight": 2,
+            "field": "quiz_timing"
+          }
+        },
+        {
+          "type": "question",
+          "settings": {
+            "heading": "How do you like to take it?",
+            "subheading": "",
+            "answers": "Drink mix | format-drink-mix\nCapsules | format-capsules\nGummies | format-gummies",
+            "multi": false,
+            "role": "rank",
+            "weight": 4,
+            "field": "quiz_format"
+          }
+        },
+        {
+          "type": "question",
+          "settings": {
+            "heading": "Anything else you'd like support with?",
+            "subheading": "Pick all that apply.",
+            "answers": "Energy | goal-energy\nSleep | goal-sleep\nDigestion | goal-gut\nStress | goal-calm\nNothing else",
+            "multi": true,
+            "role": "extra",
+            "field": "quiz_also"
+          }
+        },
+        {
+          "type": "question",
+          "settings": {
+            "heading": "Where do you usually shop for supplements?",
+            "subheading": "",
+            "answers": "Our website\nAmazon\nWalmart or Target\nSupplement stores (GNC, Vitamin Shoppe)\nOther websites\nI don't buy supplements yet",
+            "multi": false,
+            "role": "profile",
+            "field": "quiz_shop"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
