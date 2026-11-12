@@ -1,0 +1,78 @@
+{
+  "sections": {
+    "main": {
+      "type": "product-quiz",
+      "blocks": {
+        "q_goal": {
+          "type": "question",
+          "settings": {
+            "heading": "What do you want help with most?",
+            "subheading": "",
+            "answers": "Energy | goal-energy\nSleep | goal-sleep\nDigestion | goal-gut\nStress | goal-calm",
+            "multi": false,
+            "role": "rank",
+            "weight": 10,
+            "field": "quiz_goal"
+          }
+        },
+        "q_timing": {
+          "type": "question",
+          "settings": {
+            "heading": "When do you feel it most?",
+            "subheading": "",
+            "answers": "Mornings | timing-morning\nAfternoon crash | timing-afternoon\nAt night | timing-night",
+            "multi": false,
+            "role": "rank",
+            "weight": 2,
+            "field": "quiz_timing"
+          }
+        },
+        "q_format": {
+          "type": "question",
+          "settings": {
+            "heading": "How do you like to take it?",
+            "subheading": "",
+            "answers": "Drink mix | format-drink-mix\nCapsules | format-capsules\nGummies | format-gummies",
+            "multi": false,
+            "role": "rank",
+            "weight": 4,
+            "field": "quiz_format"
+          }
+        },
+        "q_also": {
+          "type": "question",
+          "settings": {
+            "heading": "Anything else you'd like support with?",
+            "subheading": "Pick all that apply.",
+            "answers": "Energy | goal-energy\nSleep | goal-sleep\nDigestion | goal-gut\nStress | goal-calm\nNothing else",
+            "multi": true,
+            "role": "extra",
+            "field": "quiz_also"
+          }
+        },
+        "q_shop": {
+          "type": "question",
+          "settings": {
+            "heading": "Where do you usually shop for supplements?",
+            "subheading": "",
+            "answers": "Our website\nAmazon\nWalmart or Target\nSupplement stores (GNC, Vitamin Shoppe)\nOther websites\nI don't buy supplements yet",
+            "multi": false,
+            "role": "profile",
+            "field": "quiz_shop"
+          }
+        }
+      },
+      "block_order": ["q_goal", "q_timing", "q_format", "q_also", "q_shop"],
+      "settings": {
+        "collection": "quiz",
+        "picks": 3,
+        "tie_tag": "bestseller",
+        "klaviyo_public_key": "",
+        "klaviyo_list_id": "",
+        "discount_code": "QUIZ15",
+        "discount_percent": 15
+      }
+    }
+  },
+  "order": ["main"]
+}
