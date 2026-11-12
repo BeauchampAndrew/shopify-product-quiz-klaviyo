@@ -16,7 +16,7 @@
 -%}
 
 <product-quiz
-  class="pqz{% if s.uppercase_headings %} pqz--upper{% endif %}"
+  class="pqz{% if s.uppercase_headings %} pqz--upper{% endif %}{% if s.full_page %} pqz--fullpage{% endif %}"
   data-section-id="{{ section.id }}"
   style="--pqz-bg: {{ s.color_bg }}; --pqz-ink: {{ s.color_ink }}; --pqz-accent: {{ s.color_accent }}; --pqz-btn-fg: {{ s.color_button_text }}; --pqz-btn-radius: {{ btn_radius }}; --pqz-border: {{ s.border_width }}px; --pqz-max-width: {{ s.max_width }}em; --pqz-pad-top: {{ s.padding_top }}px; --pqz-pad-bottom: {{ s.padding_bottom }}px;"
   data-money-sample="{{ 123456789 | money | strip_html | escape }}"
@@ -57,6 +57,21 @@
   data-label-error="{{ s.label_error | escape }}"
   data-label-empty="{{ s.label_empty | escape }}"
 >
+  {%- if s.full_page and s.show_bar -%}
+    {%- comment -%} Full page hides the theme's header, so give shoppers a way home and to their cart. {%- endcomment -%}
+    <div class="pqz__bar">
+      <a class="pqz__brand" href="{{ routes.root_url }}">
+        {%- if s.logo -%}
+          {{ s.logo | image_url: width: 400 | image_tag: alt: shop.name, class: 'pqz__logo', loading: 'eager' }}
+        {%- else -%}
+          {{ shop.name }}
+        {%- endif -%}
+      </a>
+      <a class="pqz__cart-link" href="{{ routes.cart_url }}" data-pqz-cart-link>
+        {{- s.label_cart }} (<span data-pqz-cart-count>{{ cart.item_count }}</span>)
+      </a>
+    </div>
+  {%- endif -%}
   <div class="pqz__inner">
     <div class="pqz__stage" data-pqz-stage></div>
     <noscript><p class="pqz__empty">{{ s.label_empty }}</p></noscript>
@@ -113,6 +128,54 @@
     color: var(--pqz-ink);
     padding: var(--pqz-pad-top) 16px var(--pqz-pad-bottom);
     line-height: 1.5;
+  }
+
+  /* Full page: hide the theme's header and footer section groups (Shopify's own classes, so any 2.0 theme)
+     and fill the screen. Cart drawers rendered outside those groups (Horizon, Dawn) keep working. */
+  body:has(.pqz--fullpage) .shopify-section-group-header-group,
+  body:has(.pqz--fullpage) .shopify-section-group-footer-group,
+  body:has(.pqz--fullpage) #shopify-section-announcement-bar,
+  body:has(.pqz--fullpage) #shopify-section-header,
+  body:has(.pqz--fullpage) #shopify-section-footer {
+    display: none !important;
+  }
+  .pqz.pqz--fullpage {
+    box-sizing: border-box;
+    min-height: 100vh;
+    min-height: 100dvh;
+    padding-top: 0;
+  }
+  .pqz--fullpage .pqz__inner {
+    padding-top: var(--pqz-pad-top);
+  }
+  .pqz__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 72em;
+    min-height: 64px;
+    margin: 0 auto;
+  }
+  .pqz .pqz__brand {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-decoration: none;
+  }
+  .pqz .pqz__logo {
+    display: block;
+    width: auto;
+    max-height: 40px;
+  }
+  .pqz .pqz__cart-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 0.875em;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-decoration: none;
   }
 
   /* Neutralize theme tag styles at zero specificity; component rules below win. */
@@ -812,6 +875,13 @@
       }
 
       onClick(event) {
+        // Cart link in the full-page bar: open the theme's drawer when there is one, otherwise follow the link
+        const cartLink = event.target.closest('[data-pqz-cart-link]');
+        if (cartLink && this.hasThemeCart()) {
+          event.preventDefault();
+          this.openThemeCart();
+          return;
+        }
         const target = event.target.closest('button');
         if (!target || !this.contains(target)) return;
         if (target.matches('[data-pqz-answer]')) this.answer(Number(target.dataset.pqzAnswer));
@@ -1231,6 +1301,8 @@
           if (this.discountActive) await this.applyCode();
           cart = await this.fetchCart();
           settle.resolve({ cart: this.toStandardCart(cart), detail: { itemCount: cart.item_count } });
+          const count = this.querySelector('[data-pqz-cart-count]');
+          if (count) count.textContent = String(cart.item_count);
         } catch (e) {
           settle.reject(e);
         }
@@ -1280,6 +1352,15 @@
         }
         // Everyone else: listen for this and refresh your cart UI
         document.dispatchEvent(new CustomEvent('product-quiz:cart:added', { bubbles: true, detail: { cart } }));
+      }
+
+      hasThemeCart() {
+        const themeDrawer = document.querySelector('theme-drawer#cart-drawer');
+        const dawnDrawer = document.querySelector('cart-drawer');
+        return Boolean(
+          (themeDrawer && typeof themeDrawer.open === 'function') ||
+            (dawnDrawer && typeof dawnDrawer.renderContents === 'function' && typeof dawnDrawer.getSectionsToRender === 'function')
+        );
       }
 
       // Open the theme's cart drawer. Each branch is feature-detected and does nothing elsewhere.
@@ -1368,6 +1449,31 @@
       "id": "intro_text",
       "label": "Intro text",
       "default": "5 quick questions and we'll build your routine."
+    },
+    {
+      "type": "header",
+      "content": "Page"
+    },
+    {
+      "type": "checkbox",
+      "id": "full_page",
+      "label": "Full page",
+      "default": true,
+      "info": "Hides the theme's header and footer on this page so the quiz fills the screen."
+    },
+    {
+      "type": "checkbox",
+      "id": "show_bar",
+      "label": "Show a slim bar with your logo and cart",
+      "default": true,
+      "visible_if": "{{ section.settings.full_page }}"
+    },
+    {
+      "type": "image_picker",
+      "id": "logo",
+      "label": "Logo",
+      "info": "Leave empty to show your store name.",
+      "visible_if": "{{ section.settings.full_page and section.settings.show_bar }}"
     },
     {
       "type": "header",
@@ -1644,6 +1750,12 @@
       "id": "label_empty",
       "label": "No products",
       "default": "No products to recommend yet."
+    },
+    {
+      "type": "text",
+      "id": "label_cart",
+      "label": "Cart link (full page bar)",
+      "default": "Cart"
     }
   ],
   "blocks": [
