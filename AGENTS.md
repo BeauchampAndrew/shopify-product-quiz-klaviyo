@@ -20,7 +20,6 @@ tests/helpers/load-logic.mjs       Pulls the logic out of the section file; load
 demo/page.quiz.json                The 5-question demo template (Klaviyo key and list left blank on purpose)
 demo/build_product_images.py       Draws the 12 DAYLINE packshots (Pillow) into demo/product-images/
 demo/build_products_csv.py         Writes demo/products.csv for Products > Import
-docs/superpowers/                  Design doc and build plan
 ```
 
 ## Installing into a theme

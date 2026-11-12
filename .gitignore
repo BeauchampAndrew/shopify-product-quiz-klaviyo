@@ -7,3 +7,5 @@ CLAUDE.local.md
 credentials.json
 .DS_Store
 video/
+docs/superpowers/
+.superpowers/
