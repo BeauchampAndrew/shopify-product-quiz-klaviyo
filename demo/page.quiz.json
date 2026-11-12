@@ -62,17 +62,27 @@
           }
         }
       },
-      "block_order": ["q_goal", "q_timing", "q_format", "q_also", "q_shop"],
+      "block_order": [
+        "q_goal",
+        "q_timing",
+        "q_format",
+        "q_also",
+        "q_shop"
+      ],
       "settings": {
         "collection": "quiz",
         "picks": 3,
         "tie_tag": "bestseller",
         "klaviyo_public_key": "",
         "klaviyo_list_id": "",
+        "offer_discount": true,
         "discount_code": "QUIZ15",
-        "discount_percent": 15
+        "discount_percent": 15,
+        "second_chance": true
       }
     }
   },
-  "order": ["main"]
+  "order": [
+    "main"
+  ]
 }

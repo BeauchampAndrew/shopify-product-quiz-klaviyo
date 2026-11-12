@@ -13,8 +13,8 @@ Built with Claude Code on camera for the BS&Co YouTube channel.
 - **As many questions as you need.** Each question is one block in the theme editor. Add, remove and reorder them.
 - **Single or multiple choice.** Single-choice questions move on as soon as the shopper taps. Multiple-choice questions show a Continue button.
 - **Progress bar.** "Question 2 of 5" with a bar that fills as they go, plus a Back link.
-- **Email step with a discount.** "Share your email & get 15% off", with a Skip link. On submit the shopper joins your Klaviyo list, every answer is saved on their profile, and the discount code goes on their cart automatically.
-- **A second chance.** Shoppers who skipped the email see a small "Still want 15% off?" box under their stack. Entering an email there does everything the email step does, right on the results page.
+- **Email step, with or without a discount.** Shoppers can share their email (or Skip) to get their results by email. On submit they join your Klaviyo list and every answer is saved on their profile. Turn on **Offer a discount for the email** and the step becomes "Share your email & get 15% off", with the code going on their cart automatically.
+- **A second chance (optional).** With the discount on, you can also turn on **Ask again on the results page**: shoppers who skipped the email see a small "Still want 15% off?" box under their stack. Entering an email there does everything the email step does, right on the results page.
 - **Your stack.** The top picks (3 by default) with a "Matches: Energy · Gummies" line and a one-sentence description, an Add to cart on each, and an Add all button with the total. If they shared their email, the total shows the discounted price.
 - **Full page.** The quiz hides your theme's header and footer and fills the screen, with a slim bar on top: your logo (or store name) linking home, and a "Cart (2)" link. Both are settings.
 - **Shows the cart.** Every Add to cart opens the theme's cart drawer so shoppers see everything in their cart. Themes without a drawer go to the cart page.
@@ -45,11 +45,13 @@ You need:
 
 **Products > Collections > Create collection.** Set it to add products automatically when the product tag is `quiz` (or pick products by hand). The quiz recommends from this collection, up to 50 products.
 
-### Step 3: Create the discount code (optional)
+### Step 3: Create the discount code (only if you offer one)
 
 **Discounts > Create discount > Amount off order.** Percentage 15, code `QUIZ15` (or your own). We use **Limit to one use per customer**.
 
 Make sure the email step's text matches how you set the code up. The default text says "15% off your order". If you limit the code to first-time customers, say so.
+
+No discount? Skip this step and leave **Offer a discount for the email** off. The email step then says "Want your results by email?" (you can change the words).
 
 ### Step 4: Make the page
 
@@ -63,7 +65,7 @@ Click the **Product quiz** section and fill in:
 
 - **Products to recommend:** the collection from step 2.
 - **Klaviyo public API key** and **List ID** (see [Klaviyo](#klaviyo)). Leave them blank to skip the email step.
-- **Discount code** and **Discount percent** from step 3.
+- **Offer a discount for the email**, then the **Discount code** and **Discount percent** from step 3. Optionally **Ask again on the results page**.
 
 Then edit the questions (below).
 

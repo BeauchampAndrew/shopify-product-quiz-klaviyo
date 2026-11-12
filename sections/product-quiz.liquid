@@ -31,20 +31,20 @@
   data-klaviyo-list="{{ s.klaviyo_list_id | strip | escape }}"
   data-klaviyo-source="{{ s.klaviyo_source | escape }}"
   data-klaviyo-event="{{ s.klaviyo_event | escape }}"
-  data-discount-code="{{ s.discount_code | strip | escape }}"
+  data-discount-code="{% if s.offer_discount %}{{ s.discount_code | strip | escape }}{% endif %}"
   data-discount-percent="{{ s.discount_percent }}"
   data-label-intro-heading="{{ s.intro_heading | escape }}"
   data-label-intro-text="{{ s.intro_text | escape }}"
   data-label-progress="{{ s.label_progress | escape }}"
   data-label-back="{{ s.label_back | escape }}"
   data-label-continue="{{ s.label_continue | escape }}"
-  data-label-email-heading="{{ s.email_heading | escape }}"
-  data-label-email-text="{{ s.email_text | escape }}"
+  data-label-email-heading="{% if s.offer_discount %}{{ s.email_heading | escape }}{% else %}{{ s.email_heading_plain | escape }}{% endif %}"
+  data-label-email-text="{% if s.offer_discount %}{{ s.email_text | escape }}{% else %}{{ s.email_text_plain | escape }}{% endif %}"
   data-label-email-placeholder="{{ s.email_placeholder | escape }}"
-  data-label-email-button="{{ s.email_button | escape }}"
+  data-label-email-button="{% if s.offer_discount %}{{ s.email_button | escape }}{% else %}{{ s.email_button_plain | escape }}{% endif %}"
   data-label-email-skip="{{ s.email_skip | escape }}"
   data-label-email-invalid="{{ s.email_invalid | escape }}"
-  data-second-chance="{{ s.second_chance }}"
+  data-second-chance="{% if s.offer_discount and s.second_chance %}true{% else %}false{% endif %}"
   data-label-second-heading="{{ s.second_heading | escape }}"
   data-label-second-text="{{ s.second_text | escape }}"
   data-label-second-button="{{ s.second_button | escape }}"
@@ -1580,24 +1580,34 @@
       "content": "Discount"
     },
     {
+      "type": "checkbox",
+      "id": "offer_discount",
+      "label": "Offer a discount for the email",
+      "default": false,
+      "info": "Off: the quiz still asks for an email, with no discount promised. On: the code below goes on the shopper's cart when they share their email."
+    },
+    {
       "type": "text",
       "id": "discount_code",
       "label": "Discount code",
-      "info": "Applied to the cart after the shopper shares their email. Create the code in Discounts first."
+      "info": "Applied to the cart after the shopper shares their email. Create the code in Discounts first.",
+      "visible_if": "{{ section.settings.offer_discount }}"
     },
     {
       "type": "number",
       "id": "discount_percent",
       "label": "Discount percent",
       "default": 15,
-      "info": "Only used to show the discounted total. Match the code."
+      "info": "Only used to show the discounted total. Match the code.",
+      "visible_if": "{{ section.settings.offer_discount }}"
     },
     {
       "type": "checkbox",
       "id": "second_chance",
       "label": "Ask again on the results page",
-      "default": true,
-      "info": "Shoppers who skipped the email see a small \"Still want 15% off?\" box under their stack."
+      "default": false,
+      "info": "Shoppers who skipped the email see a small \"Still want 15% off?\" box under their stack.",
+      "visible_if": "{{ section.settings.offer_discount }}"
     },
     {
       "type": "header",
@@ -1723,13 +1733,15 @@
       "type": "text",
       "id": "email_heading",
       "label": "Email step heading",
-      "default": "Share your email & get 15% off"
+      "default": "Share your email & get 15% off",
+      "visible_if": "{{ section.settings.offer_discount }}"
     },
     {
       "type": "textarea",
       "id": "email_text",
       "label": "Email step text",
-      "default": "You'll get exclusive access to new products & promotions, 15% off your order, and we'll email you your personalized supplement recommendations."
+      "default": "You'll get exclusive access to new products & promotions, 15% off your order, and we'll email you your personalized supplement recommendations.",
+      "visible_if": "{{ section.settings.offer_discount }}"
     },
     {
       "type": "text",
@@ -1741,7 +1753,29 @@
       "type": "text",
       "id": "email_button",
       "label": "Email button",
-      "default": "Claim discount"
+      "default": "Claim discount",
+      "visible_if": "{{ section.settings.offer_discount }}"
+    },
+    {
+      "type": "text",
+      "id": "email_heading_plain",
+      "label": "Email step heading (no discount)",
+      "default": "Want your results by email?",
+      "visible_if": "{{ section.settings.offer_discount == false }}"
+    },
+    {
+      "type": "textarea",
+      "id": "email_text_plain",
+      "label": "Email step text (no discount)",
+      "default": "We'll email you your personalized recommendations.",
+      "visible_if": "{{ section.settings.offer_discount == false }}"
+    },
+    {
+      "type": "text",
+      "id": "email_button_plain",
+      "label": "Email button (no discount)",
+      "default": "See my results",
+      "visible_if": "{{ section.settings.offer_discount == false }}"
     },
     {
       "type": "text",
@@ -1759,19 +1793,22 @@
       "type": "text",
       "id": "second_heading",
       "label": "Results box heading (skipped email)",
-      "default": "Still want 15% off?"
+      "default": "Still want 15% off?",
+      "visible_if": "{{ section.settings.offer_discount and section.settings.second_chance }}"
     },
     {
       "type": "text",
       "id": "second_text",
       "label": "Results box text",
-      "default": "Drop your email and we'll put the code on your cart."
+      "default": "Drop your email and we'll put the code on your cart.",
+      "visible_if": "{{ section.settings.offer_discount and section.settings.second_chance }}"
     },
     {
       "type": "text",
       "id": "second_button",
       "label": "Results box button",
-      "default": "Get my 15% off"
+      "default": "Get my 15% off",
+      "visible_if": "{{ section.settings.offer_discount and section.settings.second_chance }}"
     },
     {
       "type": "text",
@@ -1825,7 +1862,8 @@
       "type": "text",
       "id": "label_discount",
       "label": "Discount applied",
-      "default": "[percent]% off applied at checkout with code [code]"
+      "default": "[percent]% off applied at checkout with code [code]",
+      "visible_if": "{{ section.settings.offer_discount }}"
     },
     {
       "type": "text",

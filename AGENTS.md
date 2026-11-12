@@ -7,7 +7,7 @@ Instructions for AI coding agents (Claude Code, Cursor, Codex, etc.) installing,
 A single Shopify theme section, `sections/product-quiz.liquid`, that renders a product quiz:
 
 1. **Questions** (blocks of type `question`), one per screen, with a progress bar. Single-select advances on tap; multi-select has a Continue button.
-2. **Email step** (only when the Klaviyo public key and list ID are set): subscribes the shopper to a Klaviyo list, saves every answer on their profile, sends a "Completed Product Quiz" event, and applies the discount code to the cart.
+2. **Email step** (only when the Klaviyo public key and list ID are set): subscribes the shopper to a Klaviyo list, saves every answer on their profile, sends a "Completed Product Quiz" event, and (when `offer_discount` is on) applies the discount code to the cart.
 3. **Results ("Your stack")**: the top picks from one collection, each with a "Matches:" line, a one-sentence blurb and Add to cart, plus Add all with the total. Every add opens the theme's cart drawer (or the cart page).
 
 It drops into **any** Online Store 2.0 theme with no other changes. The discount is a normal Shopify code the merchant creates in admin. The section never creates discounts and only ever uses Klaviyo's **public** key.
@@ -29,7 +29,7 @@ Ask the human for: the store, which theme (always an unpublished copy first), th
 
 1. **Copy the section** into the theme's `sections/` folder, unchanged.
 2. **Collection (human does this in admin):** a collection of the products to recommend, usually a smart collection on a tag like `quiz`. Shopify CLI can't create collections.
-3. **Discount code (human does this in admin):** for the demo, **Amount off order**, 15%, one use per customer. Any code type works; the section only applies it and shows `discount_percent` off the stack total. The CLI can't create discounts.
+3. **Discount code (human does this in admin, only if they offer one):** `offer_discount` is off by default. When it's off, Liquid renders an empty `data-discount-code`, `data-second-chance="false"` and the `*_plain` email copy, so the JS never applies a code or promises one. For the demo, **Amount off order**, 15%, one use per customer. Any code type works; the section only applies it and shows `discount_percent` off the stack total. The CLI can't create discounts.
 4. **Page template:** copy `demo/page.quiz.json` to `templates/page.quiz.json` and edit the blocks. `collection` takes a collection **handle**. Fill in `klaviyo_public_key` and `klaviyo_list_id` in the theme's copy only; never commit a client's key to this repo.
 5. **Push to an unpublished theme:** `shopify theme push --unpublished --theme "With product quiz"`, or `--only sections/product-quiz.liquid --only templates/page.quiz.json` against an existing theme ID. Ask the human before touching the live theme (`--allow-live`).
 6. **The human creates the page** with the `quiz` template. The template dropdown only lists templates from the **published** theme; to preview before that, open any page with `?view=quiz&preview_theme_id=<theme id>`.
