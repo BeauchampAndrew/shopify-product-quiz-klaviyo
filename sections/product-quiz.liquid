@@ -1,0 +1,229 @@
+{% javascript %}
+  (() => {
+    if (customElements.get('product-quiz')) return;
+
+    // pqz:logic:start
+    // Pure functions: no DOM, no network. tests/quiz-logic.test.mjs runs them directly from this file.
+
+    // One answer per line: "Label | tag-one, tag-two". Tags are optional.
+    function parseAnswers(text) {
+      return String(text || '')
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const bar = line.indexOf('|');
+          const label = (bar === -1 ? line : line.slice(0, bar)).trim();
+          const tags = bar === -1 ? [] : line.slice(bar + 1).split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+          return { label, tags };
+        })
+        .filter((a) => a.label);
+    }
+
+    function normalizeQuestions(raw) {
+      return (raw || []).map((r, i) => {
+        const role = ['rank', 'extra', 'profile'].includes(r.role) ? r.role : 'rank';
+        const weight = role === 'rank' ? (r.weight == null || r.weight === '' ? 5 : Number(r.weight) || 0) : 0;
+        return {
+          id: String(r.id),
+          heading: r.heading || '',
+          subheading: r.subheading || '',
+          multi: Boolean(r.multi),
+          role,
+          weight,
+          field: String(r.field || '').trim() || `quiz_q${i + 1}`,
+          answers: parseAnswers(r.answers),
+        };
+      });
+    }
+
+    function normalizeProducts(raw) {
+      return (raw || []).map((r) => ({
+        id: Number(r.id),
+        title: r.title || '',
+        url: r.url || '',
+        image: r.image || '',
+        price: Number(r.price) || 0,
+        variantId: Number(r.variantId),
+        available: Boolean(r.available),
+        tags: (r.tags || []).map((t) => String(t).trim().toLowerCase()).filter(Boolean),
+        blurb: firstSentence(r.blurb),
+      }));
+    }
+
+    function firstSentence(text) {
+      const s = String(text || '').trim();
+      const m = s.match(/^.*?[.!?](?=\s|$)/);
+      return m ? m[0] : s;
+    }
+
+    // sample = Liquid's `123456789 | money`, so symbol, separators and decimals follow the shop's currency.
+    function formatMoney(cents, sample) {
+      const s = sample || '$1,234,567.89';
+      const m = s.match(/1(\D?)234\D?56[78](?:(\D)89)?/);
+      const f = m
+        ? { prefix: s.slice(0, m.index), suffix: s.slice(m.index + m[0].length), thousands: m[1], point: m[2] || '', decimals: m[2] ? 2 : 0 }
+        : { prefix: '$', suffix: '', thousands: ',', point: '.', decimals: 2 };
+      const [whole, frac] = (cents / 100).toFixed(f.decimals).split('.');
+      return f.prefix + whole.replace(/\B(?=(\d{3})+(?!\d))/g, f.thousands) + (frac ? f.point + frac : '') + f.suffix;
+    }
+
+    const tagKey = (tags) => [...tags].sort().join(',');
+    const shares = (a, b) => a.some((t) => b.includes(t));
+
+    // In an "extra" question, hide answers the shopper already chose in an earlier question (same tags).
+    function hiddenAnswers(questions, picks, qIndex) {
+      const hidden = new Set();
+      const question = questions[qIndex];
+      if (!question || question.role !== 'extra') return hidden;
+      const chosen = new Set();
+      questions.slice(0, qIndex).forEach((q) => {
+        (picks[q.id] || []).forEach((i) => {
+          const a = q.answers[i];
+          if (a && a.tags.length) chosen.add(tagKey(a.tags));
+        });
+      });
+      question.answers.forEach((a, i) => {
+        if (a.tags.length && chosen.has(tagKey(a.tags))) hidden.add(i);
+      });
+      return hidden;
+    }
+
+    function prunePicks(questions, picks) {
+      const out = {};
+      questions.forEach((q, qi) => {
+        if (!picks[q.id]) return;
+        const hidden = hiddenAnswers(questions, picks, qi);
+        out[q.id] = picks[q.id].filter((i) => !hidden.has(i));
+      });
+      return out;
+    }
+
+    // Multi-select toggle. A tagless answer means "none of these": it clears the others and vice versa.
+    function toggleMulti(answers, selected, index) {
+      if (selected.includes(index)) return selected.filter((i) => i !== index);
+      const answer = answers[index];
+      if (answer && !answer.tags.length) return [index];
+      return [...selected.filter((i) => answers[i] && answers[i].tags.length), index];
+    }
+
+    function pickStack(products, questions, picks, opts) {
+      const count = Math.max(1, Number(opts.count) || 1);
+      const tieTag = String(opts.tieTag || '').trim().toLowerCase();
+      const chosen = (role) =>
+        questions
+          .filter((q) => q.role === role)
+          .flatMap((q) => (picks[q.id] || []).map((i) => ({ q, a: q.answers[i] })))
+          .filter((c) => c.a);
+      const rankPicks = chosen('rank');
+      const score = (p) => rankPicks.reduce((sum, c) => sum + (shares(c.a.tags, p.tags) ? c.q.weight : 0), 0);
+      const ranked = products
+        .map((p, index) => ({ p, index, score: score(p), tie: tieTag && p.tags.includes(tieTag) ? 1 : 0 }))
+        .filter((r) => r.p.available)
+        .sort((a, b) => b.score - a.score || b.tie - a.tie || a.index - b.index)
+        .map((r) => r.p);
+      if (!ranked.length) return [];
+
+      const used = new Set([ranked[0]]);
+      const extraAnswers = chosen('extra')
+        .map((c) => c.a)
+        .filter((a) => a.tags.length)
+        .slice(0, count - 1);
+      const extras = [];
+      extraAnswers.forEach((a) => {
+        const hit = ranked.find((p) => !used.has(p) && shares(p.tags, a.tags));
+        if (hit) {
+          extras.push(hit);
+          used.add(hit);
+        }
+      });
+      const rest = ranked.filter((p) => !used.has(p)).slice(0, Math.max(0, count - 1 - extras.length));
+
+      const matchable = [...rankPicks, ...chosen('extra')];
+      return [ranked[0], ...extras, ...rest].slice(0, count).map((product) => ({
+        product,
+        matches: [...new Set(matchable.filter((c) => shares(c.a.tags, product.tags)).map((c) => c.a.label))],
+      }));
+    }
+
+    function profileProperties(questions, picks) {
+      const out = {};
+      questions.forEach((q) => {
+        const labels = (picks[q.id] || []).map((i) => q.answers[i] && q.answers[i].label).filter(Boolean);
+        if (!labels.length) return;
+        out[q.field] = q.multi ? labels : labels[0];
+      });
+      return out;
+    }
+
+    function discountedTotal(cents, percent) {
+      return cents - Math.round((cents * (Number(percent) || 0)) / 100);
+    }
+
+    // Saved progress may come from an older version of the quiz (questions edited in the theme editor).
+    function sanitizeState(questions, state) {
+      if (!state || typeof state !== 'object') return null;
+      const n = questions.length;
+      const step = state.step;
+      if (!Number.isInteger(step) || step < 0 || step > n + 1) return null;
+      const picks = {};
+      const raw = state.picks && typeof state.picks === 'object' ? state.picks : {};
+      questions.forEach((q) => {
+        if (!Array.isArray(raw[q.id])) return;
+        const valid = raw[q.id].filter((i) => Number.isInteger(i) && i >= 0 && i < q.answers.length);
+        if (valid.length) picks[q.id] = valid;
+      });
+      const firstOpen = questions.findIndex((q) => !picks[q.id]);
+      return { step: firstOpen === -1 ? step : Math.min(step, firstOpen), picks, claimed: Boolean(state.claimed) };
+    }
+
+    function subscriptionBody({ email, listId, source, properties }) {
+      return {
+        data: {
+          type: 'subscription',
+          attributes: {
+            custom_source: source,
+            profile: {
+              data: {
+                type: 'profile',
+                attributes: { email, properties, subscriptions: { email: { marketing: { consent: 'SUBSCRIBED' } } } },
+              },
+            },
+          },
+          relationships: { list: { data: { type: 'list', id: listId } } },
+        },
+      };
+    }
+
+    function eventBody({ email, eventName, properties, profileProperties, value, currency }) {
+      return {
+        data: {
+          type: 'event',
+          attributes: {
+            properties,
+            metric: { data: { type: 'metric', attributes: { name: eventName } } },
+            profile: { data: { type: 'profile', attributes: { email, properties: profileProperties } } },
+            value,
+            value_currency: currency,
+          },
+        },
+      };
+    }
+
+    function eventProperties({ questions, picks, stack, code, origin }) {
+      const absolute = (url) => (url.startsWith('//') ? `https:${url}` : url.startsWith('/') ? origin + url : url);
+      return {
+        answers: profileProperties(questions, picks),
+        products: stack.map(({ product }) => ({
+          title: product.title,
+          url: absolute(product.url),
+          image: product.image ? absolute(product.image) : '',
+          price: product.price / 100,
+        })),
+        product_titles: stack.map(({ product }) => product.title),
+        discount_code: code || null,
+      };
+    }
+    // pqz:logic:end
+  })();
+{% endjavascript %}
