@@ -710,13 +710,22 @@
         this.onSubmit = this.onSubmit.bind(this);
         this.addEventListener('click', this.onClick);
         this.addEventListener('submit', this.onSubmit);
+        // Coming back from the cart page via the back/forward cache: reset any button left on "Adding..."
+        this.onPageShow = (event) => {
+          if (!event.persisted) return;
+          this.adding = false;
+          this.render();
+        };
+        window.addEventListener('pageshow', this.onPageShow);
         document.addEventListener('shopify:block:select', this.onBlockSelect);
         this.render();
       }
 
       disconnectedCallback() {
         this.removeEventListener('click', this.onClick);
+        this.removeEventListener('submit', this.onSubmit);
         document.removeEventListener('shopify:block:select', this.onBlockSelect);
+        window.removeEventListener('pageshow', this.onPageShow);
         clearTimeout(this.advanceTimer);
       }
 
@@ -810,6 +819,13 @@
         else if (target.matches('[data-pqz-back]')) this.back();
         else if (target.matches('[data-pqz-retake]')) this.retake();
         else if (target.matches('[data-pqz-skip]')) this.go(this.count + 1);
+        else if (target.matches('[data-pqz-add]')) this.addToCart([{ id: Number(target.dataset.variantId), quantity: 1 }], target);
+        else if (target.matches('[data-pqz-add-all]')) {
+          this.addToCart(
+            this.stack().map(({ product }) => ({ id: product.variantId, quantity: 1 })),
+            target
+          );
+        }
       }
 
       visiblePicks(index) {
@@ -1162,6 +1178,137 @@
       async fetchCart() {
         const res = await fetch(`${this.dataset.cartUrl}.js`, { headers: { Accept: 'application/json' } });
         return res.json();
+      }
+
+      // ---- cart ----
+      // Every add shows the cart: the theme's drawer when we can open it, otherwise the cart page.
+      async addToCart(items, button) {
+        if (this.adding || !items.length) return;
+        this.adding = true;
+        const error = this.querySelector('[data-pqz-error]');
+        if (error) error.hidden = true;
+        button.classList.add('is-loading');
+        button.textContent = this.t('adding');
+
+        // Themes on Shopify's standard cart events (e.g. Horizon) refresh their cart icon and drawer from this promise
+        let settle;
+        const promise = new Promise((resolve, reject) => (settle = { resolve, reject }));
+        promise.catch(() => {});
+        const event = new Event('shopify:cart:lines-update', { bubbles: true });
+        Object.assign(event, {
+          action: 'add',
+          context: 'product',
+          lines: items.map((i) => ({ merchandiseId: `gid://shopify/ProductVariant/${i.id}`, quantity: i.quantity })),
+          promise,
+        });
+        button.dispatchEvent(event);
+
+        // 1. The add itself. Only this step can fail; Shopify's own message (like a stock limit) is shown.
+        let data;
+        try {
+          const res = await fetch(`${this.dataset.cartAddUrl}.js`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ items, sections: 'cart-icon-bubble' }),
+          });
+          data = await res.json().catch(() => ({}));
+          if (!res.ok) throw Object.assign(new Error(data.description || data.message || ''), { fromShopify: true });
+        } catch (err) {
+          settle.reject(err);
+          this.adding = false;
+          button.classList.remove('is-loading');
+          button.textContent = button.dataset.label;
+          if (error) {
+            error.textContent = (err.fromShopify && err.message) || this.t('error');
+            error.hidden = false;
+          }
+          return;
+        }
+
+        // 2. It's in the cart. Nothing below may report failure, or a retry would add it twice.
+        let cart = null;
+        try {
+          if (this.discountActive) await this.applyCode();
+          cart = await this.fetchCart();
+          settle.resolve({ cart: this.toStandardCart(cart), detail: { itemCount: cart.item_count } });
+        } catch (e) {
+          settle.reject(e);
+        }
+        try {
+          this.notifyTheme(cart, data.sections);
+        } catch (e) {}
+
+        this.adding = false;
+        button.classList.remove('is-loading');
+        button.textContent = this.t('added');
+        setTimeout(() => {
+          if (button.isConnected) button.textContent = button.dataset.label;
+        }, 2500);
+
+        const opened = await this.openThemeCart(items[0].id);
+        if (!opened) window.location.href = this.dataset.cartUrl;
+      }
+
+      toStandardCart(cart) {
+        const money = (cents) => ({ amount: (cents / 100).toFixed(2), currencyCode: cart.currency });
+        return {
+          id: cart.token,
+          totalQuantity: cart.item_count,
+          cost: { totalAmount: money(cart.total_price) },
+          lines: cart.items.map((item) => ({
+            id: item.key,
+            quantity: item.quantity,
+            cost: { totalAmount: money(item.final_line_price) },
+          })),
+          discountCodes: (cart.discount_codes || []).map((d) => ({ code: d.code, applicable: d.applicable })),
+        };
+      }
+
+      // Let other theme families know the cart changed
+      notifyTheme(cart, sections) {
+        // Dawn and Dawn-based themes: swap in the re-rendered cart icon and publish to their pub/sub
+        const bubble = document.getElementById('cart-icon-bubble');
+        const html = sections && sections['cart-icon-bubble'];
+        if (bubble && html) {
+          const fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('.shopify-section');
+          if (fresh) bubble.innerHTML = fresh.innerHTML;
+        }
+        if (cart && typeof window.publish === 'function') {
+          try {
+            window.publish('cart-update', { source: 'product-quiz', cartData: cart });
+          } catch (e) {}
+        }
+        // Everyone else: listen for this and refresh your cart UI
+        document.dispatchEvent(new CustomEvent('product-quiz:cart:added', { bubbles: true, detail: { cart } }));
+      }
+
+      // Open the theme's cart drawer. Each branch is feature-detected and does nothing elsewhere.
+      // Returns false when no drawer was found, so the caller can go to the cart page instead.
+      // To support another theme, add a branch here (see AGENTS.md, "Supporting another theme's cart").
+      async openThemeCart(variantId) {
+        // Horizon family: <theme-drawer id="cart-drawer"> with open() / isOpen
+        const themeDrawer = document.querySelector('theme-drawer#cart-drawer');
+        if (themeDrawer && typeof themeDrawer.open === 'function') {
+          requestAnimationFrame(() => {
+            if (!themeDrawer.isOpen) themeDrawer.open();
+          });
+          return true;
+        }
+        // Dawn family: <cart-drawer> with renderContents(). Re-render its sections after the discount is applied, then open it.
+        const dawnDrawer = document.querySelector('cart-drawer');
+        if (dawnDrawer && typeof dawnDrawer.renderContents === 'function' && typeof dawnDrawer.getSectionsToRender === 'function') {
+          try {
+            const ids = dawnDrawer.getSectionsToRender().map((section) => section.id);
+            const res = await fetch(`${window.location.pathname}?sections=${ids.join(',')}`);
+            const sections = await res.json();
+            dawnDrawer.classList.remove('is-empty');
+            dawnDrawer.renderContents({ id: variantId, sections });
+            return true;
+          } catch (e) {
+            return false;
+          }
+        }
+        return false;
       }
 
       retakeButton() {
