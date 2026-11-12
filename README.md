@@ -14,6 +14,7 @@ Built with Claude Code on camera for the BS&Co YouTube channel.
 - **Single or multiple choice.** Single-choice questions move on as soon as the shopper taps. Multiple-choice questions show a Continue button.
 - **Progress bar.** "Question 2 of 5" with a bar that fills as they go, plus a Back link.
 - **Email step with a discount.** "Share your email & get 15% off", with a Skip link. On submit the shopper joins your Klaviyo list, every answer is saved on their profile, and the discount code goes on their cart automatically.
+- **A second chance.** Shoppers who skipped the email see a small "Still want 15% off?" box under their stack. Entering an email there does everything the email step does, right on the results page.
 - **Your stack.** The top picks (3 by default) with a "Matches: Energy · Gummies" line and a one-sentence description, an Add to cart on each, and an Add all button with the total. If they shared their email, the total shows the discounted price.
 - **Full page.** The quiz hides your theme's header and footer and fills the screen, with a slim bar on top: your logo (or store name) linking home, and a "Cart (2)" link. Both are settings.
 - **Shows the cart.** Every Add to cart opens the theme's cart drawer so shoppers see everything in their cart. Themes without a drawer go to the cart page.

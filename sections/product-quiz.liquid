@@ -44,6 +44,10 @@
   data-label-email-button="{{ s.email_button | escape }}"
   data-label-email-skip="{{ s.email_skip | escape }}"
   data-label-email-invalid="{{ s.email_invalid | escape }}"
+  data-second-chance="{{ s.second_chance }}"
+  data-label-second-heading="{{ s.second_heading | escape }}"
+  data-label-second-text="{{ s.second_text | escape }}"
+  data-label-second-button="{{ s.second_button | escape }}"
   data-label-results-heading="{{ s.results_heading | escape }}"
   data-label-results-intro="{{ s.results_intro | escape }}"
   data-label-matches="{{ s.label_matches | escape }}"
@@ -497,6 +501,37 @@
   }
   .pqz__skip {
     margin-top: 0.75em;
+  }
+
+  /* Second chance on results */
+  .pqz__second {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 28em;
+    margin-top: 1.5em;
+    padding: 1.5em 1.25em;
+    border: var(--pqz-border) solid var(--pqz-ink);
+    border-radius: min(var(--pqz-btn-radius), 12px);
+  }
+  .pqz__second-heading {
+    font-size: 1.125em;
+    font-weight: 700;
+  }
+  .pqz.pqz--upper .pqz__second-heading {
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .pqz__second-text {
+    margin-top: 0.4em;
+    font-size: 0.9375em;
+    opacity: 0.85;
+  }
+  .pqz .pqz__second .pqz__form {
+    margin-top: 1em;
+  }
+  .pqz .pqz__second .pqz__submit {
+    width: 100%;
+    margin-top: 0.25em;
   }
   .pqz__visually-hidden {
     position: absolute !important;
@@ -1091,7 +1126,11 @@
         error.dataset.pqzError = '';
         error.setAttribute('role', 'alert');
         error.hidden = true;
-        summary.append(totalLine, addAll, discount, error, this.retakeButton());
+        summary.append(totalLine, addAll, discount, error);
+        if (!this.state.claimed && this.emailEnabled && this.dataset.secondChance === 'true') {
+          summary.append(this.secondChance());
+        }
+        summary.append(this.retakeButton());
         screen.append(summary);
         this.stage.append(screen);
       }
@@ -1101,13 +1140,8 @@
         return Boolean(this.dataset.klaviyoKey && this.dataset.klaviyoList);
       }
 
-      renderEmail() {
-        const id = `pqz-${this.dataset.sectionId}-email`;
-        const screen = el('div', 'pqz__screen pqz__screen--email');
-        screen.append(this.heading(this.t('emailHeading')));
-        const text = this.t('emailText');
-        if (text) screen.append(el('p', 'pqz__sub', text));
-
+      // The email form, shared by the email step and the "still want 15% off?" box on results. onSubmit handles both.
+      emailForm(id, buttonText) {
         const form = el('form', 'pqz__form');
         form.noValidate = true;
         form.dataset.pqzEmailForm = '';
@@ -1120,9 +1154,32 @@
         const error = el('p', 'pqz__field-error', this.t('emailInvalid'));
         error.id = `${id}-error`;
         error.hidden = true;
-        const submit = el('button', 'pqz__btn pqz__submit', this.t('emailButton'));
+        const submit = el('button', 'pqz__btn pqz__submit', buttonText);
         submit.type = 'submit';
         form.append(label, input, error, submit);
+        return form;
+      }
+
+      // Second chance on results for shoppers who skipped the email step.
+      secondChance() {
+        const box = el('div', 'pqz__second');
+        box.append(el('p', 'pqz__second-heading', this.t('secondHeading')));
+        const text = this.t('secondText');
+        if (text) box.append(el('p', 'pqz__second-text', text));
+        const form = this.emailForm(`pqz-${this.dataset.sectionId}-email-second`, this.t('secondButton'));
+        form.dataset.pqzSecond = '';
+        box.append(form);
+        return box;
+      }
+
+      renderEmail() {
+        const id = `pqz-${this.dataset.sectionId}-email`;
+        const screen = el('div', 'pqz__screen pqz__screen--email');
+        screen.append(this.heading(this.t('emailHeading')));
+        const text = this.t('emailText');
+        if (text) screen.append(el('p', 'pqz__sub', text));
+
+        const form = this.emailForm(id, this.t('emailButton'));
 
         const skip = el('button', 'pqz__link pqz__skip', this.t('emailSkip'));
         skip.type = 'button';
@@ -1150,13 +1207,25 @@
           input.focus();
           return;
         }
-        this.claim(email);
+        this.claim(email, { stay: form.hasAttribute('data-pqz-second') });
       }
 
       // Show results first; Klaviyo and the discount run in the background and can never block the shopper.
-      claim(email) {
+      // stay: claimed from the box on results, so redraw in place (no jump to the top) and point focus at the discount line.
+      claim(email, { stay = false } = {}) {
         this.state.claimed = true;
-        this.go(this.count + 1);
+        if (stay) {
+          this.save();
+          this.render();
+          const line = this.stage.querySelector('[data-pqz-discount]');
+          if (line) {
+            line.tabIndex = -1;
+            line.focus({ preventScroll: true });
+            line.scrollIntoView({ block: 'center' });
+          }
+        } else {
+          this.go(this.count + 1);
+        }
         this.sendToKlaviyo(email);
         if (this.dataset.discountCode) this.linkDiscount().then(() => this.applyCode());
       }
@@ -1524,6 +1593,13 @@
       "info": "Only used to show the discounted total. Match the code."
     },
     {
+      "type": "checkbox",
+      "id": "second_chance",
+      "label": "Ask again on the results page",
+      "default": true,
+      "info": "Shoppers who skipped the email see a small \"Still want 15% off?\" box under their stack."
+    },
+    {
       "type": "header",
       "content": "Colors"
     },
@@ -1678,6 +1754,24 @@
       "id": "email_invalid",
       "label": "Invalid email message",
       "default": "Enter a valid email address."
+    },
+    {
+      "type": "text",
+      "id": "second_heading",
+      "label": "Results box heading (skipped email)",
+      "default": "Still want 15% off?"
+    },
+    {
+      "type": "text",
+      "id": "second_text",
+      "label": "Results box text",
+      "default": "Drop your email and we'll put the code on your cart."
+    },
+    {
+      "type": "text",
+      "id": "second_button",
+      "label": "Results box button",
+      "default": "Get my 15% off"
     },
     {
       "type": "text",

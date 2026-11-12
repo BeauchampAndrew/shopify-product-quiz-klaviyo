@@ -90,7 +90,9 @@ Liquid renders a JSON config in `<script type="application/json" data-pqz-config
 | `answer(index)` | Single-select: save, show pressed, advance after 200ms (ignores taps meanwhile). Multi-select: `toggleMulti` |
 | `render` / `renderQuestion` / `renderEmail` / `renderResults` | Draw the current screen |
 | `onBlockSelect` | Theme editor: selecting a question block shows that question |
-| `onSubmit` / `claim(email)` | Validate the email, show results, then `sendToKlaviyo` and `linkDiscount` + `applyCode` |
+| `emailForm(id, buttonText)` | Builds the email form used by the email step and the results box. Any `form[data-pqz-email-form]` goes through `onSubmit` |
+| `secondChance()` | The "Still want 15% off?" box on results, shown when `!claimed`, `emailEnabled` and `second_chance` is on. Its form carries `data-pqz-second` |
+| `onSubmit` / `claim(email, { stay })` | Validate the email, show results, then `sendToKlaviyo` and `linkDiscount` + `applyCode`. `stay` (from the results box) redraws in place and focuses the discount line instead of jumping to the top |
 | `sendToKlaviyo(email)` | POST subscription (profile properties included), then the event. Dispatches `product-quiz:completed` |
 | `linkDiscount()` | GET `/discount/<code>?redirect=/cart.js` so Shopify's checkout cookie carries the code |
 | `applyCode()` | Add the code to the cart's codes via `/cart/update.js`, keeping other codes. Runs on claim and on every add |
