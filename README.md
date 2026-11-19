@@ -4,6 +4,8 @@ A product quiz for any Shopify theme. Shoppers answer a few questions, one per s
 
 It's one file. No app, no monthly fee, and you set up the questions in the theme editor.
 
+**[Try the live demo](https://beauchampandrew.github.io/shopify-product-quiz-klaviyo/)**: take the quiz, add to cart, and see exactly what gets saved to Klaviyo. No login needed.
+
 **Using Claude Code, Cursor or another AI coding tool?** Point it at this repo and say what you want, like "install this in my theme" or "add a question about budget". [AGENTS.md](AGENTS.md) tells it how everything works and how to change it without breaking it in other themes.
 
 Built with Claude Code on camera for the BS&Co YouTube channel.
@@ -141,6 +143,8 @@ Every word is a setting under **Text and translations**: the progress text ("Que
 - Products with options (sizes, flavors) add their first available variant.
 
 ## Try the demo
+
+**Live:** https://beauchampandrew.github.io/shopify-product-quiz-klaviyo/ runs the real section with the DAYLINE quiz. The cart and Klaviyo are stand-ins, so nothing is saved or sent. It's rebuilt from `sections/product-quiz.liquid` on every push to `main` (`demo/build_demo_site.mjs`, deployed by `.github/workflows/demo-site.yml`), so it always matches the code.
 
 [`demo/`](demo) has the fictional supplement brand DAYLINE we built the video with: 12 products (4 goals × 3 formats), a CSV for **Products > Import**, the packshots, and [`demo/page.quiz.json`](demo/page.quiz.json), the 5-question quiz template. Fill in your own Klaviyo key and list ID after you install it.
 
